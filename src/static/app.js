@@ -472,10 +472,90 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  // Build a shareable URL for a given activity name
+  function getActivityShareUrl(activityName) {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("activity", activityName);
+    return url.toString();
+  }
+
+  // Copy text to clipboard and show feedback on the button
+  function copyToClipboard(text, button) {
+    navigator.clipboard.writeText(text).then(() => {
+      const original = button.innerHTML;
+      button.innerHTML = "✅";
+      button.title = "Copied!";
+      setTimeout(() => {
+        button.innerHTML = original;
+        button.title = "Copy link";
+      }, 2000);
+    }).catch(() => {
+      showMessage("Could not copy link. Please copy it manually from the address bar.", "error");
+    });
+  }
+
+  // Create share buttons for an activity
+  function createShareButtons(name, details) {
+    const shareUrl = getActivityShareUrl(name);
+    const shareText = `Check out "${name}" at Mergington High School! ${details.description}`;
+
+    const container = document.createElement("div");
+    container.className = "share-buttons";
+
+    // Twitter/X share
+    const twitterBtn = document.createElement("a");
+    twitterBtn.className = "share-button share-twitter";
+    twitterBtn.innerHTML = "𝕏";
+    twitterBtn.title = "Share on X (Twitter)";
+    twitterBtn.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}&url=${encodeURIComponent(shareUrl)}`;
+    twitterBtn.target = "_blank";
+    twitterBtn.rel = "noopener noreferrer";
+    container.appendChild(twitterBtn);
+
+    // Facebook share
+    const facebookBtn = document.createElement("a");
+    facebookBtn.className = "share-button share-facebook";
+    facebookBtn.innerHTML = "f";
+    facebookBtn.title = "Share on Facebook";
+    facebookBtn.href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`;
+    facebookBtn.target = "_blank";
+    facebookBtn.rel = "noopener noreferrer";
+    container.appendChild(facebookBtn);
+
+    // Copy link button
+    const copyBtn = document.createElement("button");
+    copyBtn.className = "share-button share-copy";
+    copyBtn.innerHTML = "🔗";
+    copyBtn.title = "Copy link";
+    copyBtn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      copyToClipboard(shareUrl, copyBtn);
+    });
+    container.appendChild(copyBtn);
+
+    return container;
+  }
+
+  // Scroll to and highlight an activity card by name
+  function highlightActivity(activityName) {
+    const cards = document.querySelectorAll(".activity-card");
+    for (const card of cards) {
+      const heading = card.querySelector("h4");
+      if (heading && heading.textContent.trim() === activityName) {
+        card.classList.add("activity-highlight");
+        card.scrollIntoView({ behavior: "smooth", block: "center" });
+        setTimeout(() => card.classList.remove("activity-highlight"), 3000);
+        break;
+      }
+    }
+  }
+
   // Function to render a single activity card
   function renderActivityCard(name, details) {
     const activityCard = document.createElement("div");
     activityCard.className = "activity-card";
+    activityCard.dataset.activityName = name;
 
     // Calculate spots and capacity
     const totalSpots = details.max_participants;
@@ -586,6 +666,9 @@ document.addEventListener("DOMContentLoaded", () => {
         });
       }
     }
+
+    // Append share buttons
+    activityCard.appendChild(createShareButtons(name, details));
 
     activitiesList.appendChild(activityCard);
   }
@@ -861,8 +944,18 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeRangeFilter,
   };
 
+  // If URL contains ?activity=..., highlight that activity after loading
+  const urlParams = new URLSearchParams(window.location.search);
+  const linkedActivity = urlParams.get("activity");
+
   // Initialize app
   checkAuthentication();
   initializeFilters();
-  fetchActivities();
+  fetchActivities().then(() => {
+    if (linkedActivity) {
+      highlightActivity(linkedActivity);
+    }
+  }).catch((error) => {
+    console.error("Error loading activities:", error);
+  });
 });
